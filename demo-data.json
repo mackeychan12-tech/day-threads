@@ -1,0 +1,384 @@
+{
+  "kind": "project-board-data",
+  "version": 1,
+  "rev": 1,
+  "savedAt": "2026-10-19T14:35:00+08:00",
+  "gantt": {
+    "version": 2,
+    "mondayStart": true,
+    "nameW": 220,
+    "settings": {
+      "rest": {
+        "enabled": true,
+        "start": "12:00",
+        "end": "13:00"
+      },
+      "workdays": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "useHolidays": true,
+      "dateOverrides": [],
+      "autoCarry": true,
+      "parallel": true,
+      "enterAction": "start",
+      "startView": "today",
+      "motion": "auto"
+    },
+    "view": {
+      "year": 2026,
+      "month": 10
+    },
+    "months": {
+      "2026-10": {
+        "projects": [
+          {
+            "id": "demo-p-lamp",
+            "name": "萤火｜桌面灯",
+            "color": "#5856D6",
+            "weeks": {
+              "2026-10-12": {
+                "note": "样品复核"
+              },
+              "2026-10-19": {
+                "note": "主图与色样"
+              },
+              "2026-10-26": {
+                "note": "交付资料"
+              }
+            }
+          },
+          {
+            "id": "demo-p-box",
+            "name": "海盐｜收纳盒",
+            "color": "#007AFF",
+            "weeks": {
+              "2026-09-28": {
+                "note": "尺寸确认"
+              },
+              "2026-10-12": {
+                "note": "打样"
+              },
+              "2026-10-26": {
+                "note": "复核到样"
+              }
+            }
+          },
+          {
+            "id": "demo-p-fan",
+            "name": "微风｜风扇",
+            "color": "#00A99D",
+            "weeks": {
+              "2026-10-19": {
+                "note": "噪声复测"
+              }
+            }
+          },
+          {
+            "id": "demo-p-paper",
+            "name": "纸舟｜包装改版",
+            "color": "#FF9500",
+            "weeks": {
+              "2026-10-05": {
+                "note": "节后补班核版"
+              },
+              "2026-10-12": {
+                "note": "打样反馈"
+              },
+              "2026-10-19": {
+                "note": "修订确认"
+              }
+            }
+          },
+          {
+            "id": "demo-p-research",
+            "name": "拾光｜新品调研",
+            "color": "#AF52DE",
+            "weeks": {}
+          },
+          {
+            "id": "demo-p-cloud",
+            "name": "云朵｜说明书",
+            "color": "#30B0C7",
+            "weeks": {
+              "2026-10-05": {
+                "note": "警示语校对"
+              },
+              "2026-10-12": {
+                "note": "签版"
+              }
+            },
+            "done": true,
+            "doneAt": 1792143000000
+          },
+          {
+            "id": "demo-p-window",
+            "name": "晴窗｜图片交付",
+            "color": "#34C759",
+            "weeks": {
+              "2026-10-12": {
+                "note": "产品图交付"
+              }
+            },
+            "done": true,
+            "doneAt": 1792387500000
+          }
+        ],
+        "colorSeq": 7,
+        "weekNotes": {
+          "2026-09-28": "国庆休假 10/1–10/7",
+          "2026-10-05": "10/8 复工 · 10/10 补班",
+          "2026-10-12": "先确认样品，再准备交付",
+          "2026-10-19": "本周：样品 / 包装 / 图片并行",
+          "2026-10-26": "月底交付资料归档"
+        }
+      },
+      "2026-11": {
+        "projects": [
+          {
+            "id": "demo-p-lamp-nov",
+            "name": "萤火｜桌面灯",
+            "color": "#5856D6",
+            "weeks": {}
+          }
+        ],
+        "colorSeq": 1,
+        "weekNotes": {
+          "2026-11-02": "同名项目已建，避免重复顺延"
+        }
+      }
+    }
+  },
+  "thread": {
+    "version": 1,
+    "days": {
+      "2026-10-18": {
+        "items": [
+          {
+            "id": "demo-yesterday-carry",
+            "text": "微风｜复测样机噪声，等样机到位",
+            "at": 1792307400000,
+            "segs": [
+              {
+                "s": 1792307400000,
+                "e": 1792310400000
+              }
+            ],
+            "running": false,
+            "done": false,
+            "doneAt": null,
+            "carried": false,
+            "from": "2026-10-18",
+            "zone": "doing",
+            "ord": 0,
+            "movedTo": "2026-10-19"
+          },
+          {
+            "id": "demo-yesterday-done-1",
+            "text": "海盐｜整理收纳尺寸对照表",
+            "at": 1792286400000,
+            "segs": [
+              {
+                "s": 1792286400000,
+                "e": 1792288800000
+              }
+            ],
+            "running": false,
+            "done": true,
+            "doneAt": 1792288800000,
+            "carried": false,
+            "from": "2026-10-18",
+            "zone": "done",
+            "ord": 0
+          },
+          {
+            "id": "demo-yesterday-done-2",
+            "text": "萤火｜记录灯罩配色备选",
+            "at": 1792303200000,
+            "segs": [
+              {
+                "s": 1792303200000,
+                "e": 1792305300000
+              }
+            ],
+            "running": false,
+            "done": true,
+            "doneAt": 1792305300000,
+            "carried": false,
+            "from": "2026-10-18",
+            "zone": "done",
+            "ord": 1
+          }
+        ]
+      },
+      "2026-10-19": {
+        "items": [
+          {
+            "id": "demo-lamp-review",
+            "text": "萤火｜主图复核：被打断后接着做",
+            "at": 1792371900000,
+            "segs": [
+              {
+                "s": 1792371900000,
+                "e": 1792374300000
+              },
+              {
+                "s": 1792376400000,
+                "e": 1792378500000
+              },
+              {
+                "s": 1792390200000,
+                "e": null
+              }
+            ],
+            "running": true,
+            "done": false,
+            "doneAt": null,
+            "carried": false,
+            "from": "2026-10-19",
+            "zone": "doing",
+            "ord": 0
+          },
+          {
+            "id": "demo-box-sample",
+            "text": "海盐｜确认样品数量（并行跟进）",
+            "at": 1792390800000,
+            "segs": [
+              {
+                "s": 1792390800000,
+                "e": null
+              }
+            ],
+            "running": true,
+            "done": false,
+            "doneAt": null,
+            "carried": false,
+            "from": "2026-10-19",
+            "zone": "doing",
+            "ord": 1
+          },
+          {
+            "id": "demo-fan-carry",
+            "text": "微风｜复测样机噪声，等样机到位",
+            "at": 1792339200000,
+            "segs": [
+              {
+                "s": 1792307400000,
+                "e": 1792310400000
+              }
+            ],
+            "running": false,
+            "done": false,
+            "doneAt": null,
+            "carried": true,
+            "from": "2026-10-18",
+            "zone": "doing",
+            "ord": 2,
+            "origAt": 1792307400000
+          },
+          {
+            "id": "demo-paper-pause",
+            "text": "纸舟｜包装打样核对，等反馈",
+            "at": 1792378500000,
+            "segs": [
+              {
+                "s": 1792378500000,
+                "e": 1792380000000
+              }
+            ],
+            "running": false,
+            "done": false,
+            "doneAt": null,
+            "carried": false,
+            "from": "2026-10-19",
+            "zone": "doing",
+            "ord": 3
+          },
+          {
+            "id": "demo-research-back",
+            "text": "拾光｜竞品尺寸整理，先放回待做",
+            "at": 1792374300000,
+            "segs": [
+              {
+                "s": 1792374300000,
+                "e": 1792375500000
+              }
+            ],
+            "running": false,
+            "done": false,
+            "doneAt": null,
+            "carried": false,
+            "from": "2026-10-19",
+            "zone": "todo",
+            "ord": 0
+          },
+          {
+            "id": "demo-cloud-new",
+            "text": "云朵｜补充说明书警示语",
+            "at": 1792389000000,
+            "segs": [],
+            "running": false,
+            "done": false,
+            "doneAt": null,
+            "carried": false,
+            "from": "2026-10-19",
+            "zone": "todo",
+            "ord": 1
+          },
+          {
+            "id": "demo-lunch-done",
+            "text": "萤火｜确认灯罩色样（11:40–13:20）",
+            "at": 1792381200000,
+            "segs": [
+              {
+                "s": 1792381200000,
+                "e": 1792387200000
+              }
+            ],
+            "running": false,
+            "done": true,
+            "doneAt": 1792387200000,
+            "carried": false,
+            "from": "2026-10-19",
+            "zone": "done",
+            "ord": 0
+          },
+          {
+            "id": "demo-window-done",
+            "text": "晴窗｜交付首版产品图",
+            "at": 1792372200000,
+            "segs": [
+              {
+                "s": 1792372200000,
+                "e": 1792373700000
+              }
+            ],
+            "running": false,
+            "done": true,
+            "doneAt": 1792387500000,
+            "carried": false,
+            "from": "2026-10-19",
+            "zone": "done",
+            "ord": 1
+          },
+          {
+            "id": "demo-no-timer",
+            "text": "云朵｜发送样品签收通知（未计时）",
+            "at": 1792387800000,
+            "segs": [],
+            "running": false,
+            "done": true,
+            "doneAt": 1792388100000,
+            "carried": false,
+            "from": "2026-10-19",
+            "zone": "done",
+            "ord": 2
+          }
+        ]
+      }
+    }
+  }
+}

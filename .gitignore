@@ -1,0 +1,30 @@
+# Actual work data, downloaded exports, and conflict backups
+/看板数据.json
+/看板数据-备份-*.json
+/今日线程_*.json
+
+# Local credentials and generated packages
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+/dist/
+__pycache__/
+*.pyc
+
+# Internal working copies and release records
+*.bak
+*.bak-*.html
+/分支记录.csv
+/发版记录.csv
+.gstack/
+
+# Local editor / operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log

@@ -17,7 +17,7 @@
 | Repository name（仓库名） | `day-threads` |
 | Visibility（可见性） | 正式公开时选 Public |
 | README / .gitignore / License | 使用代码包自带文件，无需重新生成；协议为 MIT |
-| Website（网站） | 暂留空；实际发布并验证在线演示后，再填写演示地址 |
+| Website（网站） | `https://mackeychan12-tech.github.io/day-threads/demo.html`（已上线；须保留末尾的 `demo.html`，根地址会打开需要连接本地文件夹的正式版） |
 
 Description（仓库简介，以下整段直接粘贴）：
 

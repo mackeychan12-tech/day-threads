@@ -4,6 +4,8 @@
 
 [简体中文](README.md)
 
+**[Try the live demo (fictional data, reset anytime)](https://mackeychan12-tech.github.io/day-threads/demo.html)**
+
 You're halfway through a proposal when a colleague messages you. After replying, you handle another urgent request. When you return, you have to remember what you were doing and what you planned to do next.
 
 Day Threads keeps those tasks in view. Pause when you switch away, resume when you return, and keep the earlier work sessions. Unfinished work can carry over to tomorrow.
@@ -35,6 +37,8 @@ It is intended for personal use with little setup and data you control. The two 
 ## Try the demo
 
 Download and extract the repository, then open [demo.html](demo.html) in desktop Chrome or Edge. The demo can also be served as a static page.
+
+Use `demo.html` to explore and `index.html` for your own work. The main app has no sample records, demo notice, or demo reset button.
 
 All demo records are fictional. They demonstrate interrupted work, carried items, lunch-break timing, mixed task states, holidays, makeup working days, and monthly project planning.
 

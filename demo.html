@@ -851,25 +851,9 @@
     .settings-field{min-width:130px;}.settings-date-add .settings-field:nth-child(3){min-width:100%;}
     .settings-days{gap:5px;}.settings-days label{padding:6px 8px;}
   }
-
-  .demo-banner{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 22px;
-    border-bottom:1px solid var(--line);background:var(--accent-soft);color:var(--text);font-size:13px;line-height:1.6}
-  .demo-banner .demo-copy{flex:1;min-width:260px}
-  .demo-banner strong{font-size:14px;margin-right:8px}
-  .demo-banner small{display:block;color:var(--text-2);font-size:12px}
-  .demo-banner .btn{white-space:nowrap}
-  .demo-banner a{color:var(--accent)}
-  @media(max-width:760px){.demo-banner{padding:10px 14px;gap:8px}}
 </style>
 </head>
 <body>
-<aside class="demo-banner" aria-label="公开演示说明">
-  <div class="demo-copy"><strong>虚构数据演示</strong><span>演示时间：2026 年 10 月 19 日 14:35 起（计时继续走动）</span>
-    <small>事项和设置的修改只在本页有效，刷新或重置复原。两个视图独立记录；导出仅含今日线程的各日记录。<br>先看：两件并行、打断后继续、昨日带来已暂停；默认午休下跨午休事项只计 40 分。午休等规则可在设置中调整。</small></div>
-  <button class="btn" id="demoYesterday">查看昨日</button>
-  <button class="btn" id="demoReset">重置演示</button>
-</aside>
-
 <header class="bar">
   <div class="brand"><h1>项目看板</h1><small id="brandSub">记录此刻在做什么</small></div>
   <div class="tabs" role="tablist" aria-label="看板视图">
@@ -889,6 +873,9 @@
   <div class="spacer"></div>
   <button class="btn ghost gtool" hidden id="weekStartBtn" title="切换每周起始日">周起始：周一</button>
   <span class="fsstat off" id="fsStat"><i></i><span>未连接数据文件</span></span>
+
+  <button class="btn ghost" id="demoYesterday" title="查看演示中的前一天记录">查看昨日</button>
+  <button class="btn ghost" id="demoReset" title="恢复演示的初始事项和设置">重置演示</button>
   <div class="tabs theme-tabs" role="group" aria-label="主题">
     <button class="tab" type="button" id="themeAuto" data-theme-choice="auto" aria-pressed="false">跟随系统</button>
     <button class="tab" type="button" id="themeLight" data-theme-choice="light" aria-pressed="false">浅色</button>

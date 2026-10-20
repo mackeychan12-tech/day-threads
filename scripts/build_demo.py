@@ -133,24 +133,9 @@ def mock_data() -> dict:
     }
 
 
-DEMO_CSS = """
-  .demo-banner{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 22px;
-    border-bottom:1px solid var(--line);background:var(--accent-soft);color:var(--text);font-size:13px;line-height:1.6}
-  .demo-banner .demo-copy{flex:1;min-width:260px}
-  .demo-banner strong{font-size:14px;margin-right:8px}
-  .demo-banner small{display:block;color:var(--text-2);font-size:12px}
-  .demo-banner .btn{white-space:nowrap}
-  .demo-banner a{color:var(--accent)}
-  @media(max-width:760px){.demo-banner{padding:10px 14px;gap:8px}}
-"""
-
-DEMO_BANNER = """
-<aside class="demo-banner" aria-label="公开演示说明">
-  <div class="demo-copy"><strong>虚构数据演示</strong><span>演示时间：2026 年 10 月 19 日 14:35 起（计时继续走动）</span>
-    <small>事项和设置的修改只在本页有效，刷新或重置复原。两个视图独立记录；导出仅含今日线程的各日记录。<br>先看：两件并行、打断后继续、昨日带来已暂停；默认午休下跨午休事项只计 40 分。午休等规则可在设置中调整。</small></div>
-  <button class="btn" id="demoYesterday">查看昨日</button>
-  <button class="btn" id="demoReset">重置演示</button>
-</aside>
+DEMO_TOOLS = """
+  <button class="btn ghost" id="demoYesterday" title="查看演示中的前一天记录">查看昨日</button>
+  <button class="btn ghost" id="demoReset" title="恢复演示的初始事项和设置">重置演示</button>
 """
 
 
@@ -181,8 +166,8 @@ def public_html(source: str) -> str:
 def demo_html(public: str, data: dict) -> str:
     page = public.replace("open-project-board-", "open-project-board-demo-")
     page = replace_once(page, "<title>项目周甘特看板</title>", "<title>项目看板 · 虚构数据演示</title>")
-    page = replace_once(page, "</style>", DEMO_CSS + "</style>")
-    page = replace_once(page, "<body>", "<body>" + DEMO_BANNER)
+    theme_marker = '  <div class="tabs theme-tabs" role="group" aria-label="主题">'
+    page = replace_once(page, theme_marker, DEMO_TOOLS + theme_marker)
     page = page.replace("除主题外，设置会随完整数据备份保存。",
                         "演示中的设置只在本页有效，刷新或重置会复原，不会更改实际看板。")
     page = replace_once(page, '<button class="btn" id="importBtn" title="从备份文件恢复">导入</button>', "")
@@ -274,6 +259,8 @@ def validate(public: str, demo: str, data: dict) -> None:
         assert prohibited not in demo, prohibited
     assert "function applyPack" not in demo
     assert "__DATA__" not in demo and "http://" not in demo and "https://" not in demo
+    assert 'class="demo-banner"' not in demo
+    assert "demoReset" not in public and "demoYesterday" not in public
     settings = data["gantt"]["settings"]
     assert settings["rest"] == {"enabled": True, "start": "12:00", "end": "13:00"}
     assert settings["workdays"] == [1, 2, 3, 4, 5] and settings["dateOverrides"] == []

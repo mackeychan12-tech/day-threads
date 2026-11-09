@@ -41,6 +41,8 @@ python scripts/build_demo.py --check
 
 ```sh
 node tests/settings.test.cjs
+node tests/thread-rollover.test.cjs
+node tests/gantt-groups.test.cjs
 ```
 
 测试检查计时规则、旧数据兼容、结转与工作日历的回归行为，只读取公开的 `index.html` 并使用内存数据，无需安装依赖；运行程序本身不需要 Node.js。生成一致性检查和逻辑测试通过后，仍需按上文验证浏览器中的实际流程。

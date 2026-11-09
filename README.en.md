@@ -27,12 +27,14 @@ It is intended for personal use with little setup and data you control. The two 
 - **Daily work threads:** active, queued, and completed areas; drag to change status, pause and resume, and see multiple work sessions. Concurrent timers are enabled by default and can be disabled.
 - **Carry work forward:** by default, unfinished past items move to today with their timers paused. Daily and cumulative effort are shown separately; automatic carry-over can be disabled.
 - **History and reports:** browse past days in a read-only calendar view and copy a daily report of completed and unfinished items.
-- **Weekly Gantt:** separate monthly pages, click or paint occupied weeks, add week-wide notes and project notes, reorder projects, mark them complete, or carry them to next month.
+- **Weekly Gantt:** separate monthly pages, click or paint occupied weeks, add week-wide notes and project notes, reorder projects, create custom groups, mark projects complete, or carry them to next month.
 - **Working-day display:** choose regular working weekdays, the first day of the week, and individual date overrides. Chinese public holidays and makeup working weekends for 2025 and 2026 are enabled by default; schedules do not update automatically.
 - **Local data file:** Chrome and Edge can connect to the same `看板数据.json` file. The app checks for changes when you return and before saving; detected conflicts ask you to choose a version and download the other as a backup.
 - **Themes:** choose system, light, or dark directly in the header or in Settings.
 
 ![Weekly Gantt: occupied weeks, project notes, and completed projects](docs/images/gantt.png)
+
+Click **＋ 分组** beside the project/week heading to create groups such as “Not started” or “On hold”, then drag projects into them. Rename custom groups or the default active group using the pencil icon. Removing a custom group keeps its projects, schedules, and notes. Groups and their names belong to the selected month and are not carried forward; completed projects keep their separate section.
 
 ## Try the demo
 
@@ -113,6 +115,8 @@ The script reads this package's `index.html` by default; the original author's w
 
 ```sh
 node tests/settings.test.cjs
+node tests/thread-rollover.test.cjs
+node tests/gantt-groups.test.cjs
 ```
 
 Also open both pages in a browser to check actual interactions. Logic tests do not replace UI and file-saving checks.

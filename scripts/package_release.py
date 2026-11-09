@@ -33,6 +33,8 @@ PUBLIC_FILES = (
     "scripts/build_demo.py",
     "scripts/package_release.py",
     "tests/settings.test.cjs",
+    "tests/thread-rollover.test.cjs",
+    "tests/gantt-groups.test.cjs",
 )
 
 

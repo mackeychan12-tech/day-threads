@@ -287,6 +287,27 @@
   }
   .donediv .dn{ font-weight:400; color:var(--text-3); letter-spacing:0; font-variant-numeric:tabular-nums; }
   .donediv .hint{ font-weight:400; color:var(--text-3); letter-spacing:.2px; margin-left:8px; }
+  .groupdiv .dl{ letter-spacing:0; gap:8px; max-width:100%; box-sizing:border-box; }
+  .groupdiv .group-name{ overflow:hidden; text-overflow:ellipsis; max-width:240px; }
+  .corner-heading{ display:flex; align-items:center; justify-content:space-between; gap:4px; flex-wrap:wrap; width:100%; }
+  .corner .add-group{ min-height:28px; height:auto; padding:4px 6px; font-size:11px; white-space:nowrap; }
+  .groupdiv .group-action{ border:0; background:transparent; color:var(--text-3); cursor:pointer;
+    display:inline-grid; place-items:center; width:28px; height:28px; padding:0; flex:none; border-radius:5px; }
+  .groupdiv .group-action svg{ width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.7;
+    stroke-linecap:round; stroke-linejoin:round; }
+  .groupdiv .group-action:hover{ color:var(--text); }
+  .groupdiv .remove-group:hover{ color:var(--danger-text); background:var(--danger-bg); }
+  .donediv.groupdiv.over{ background:var(--accent-soft); }
+  .group-dialog{ width:min(380px,calc(100% - 32px)); box-sizing:border-box; padding:22px;
+    border:1px solid var(--line-strong); border-radius:14px; background:var(--surface); color:var(--text); }
+  .group-dialog::backdrop{ background:rgba(0,0,0,.35); }
+  .group-dialog h2{ margin:0 0 18px; font-size:17px; }
+  .group-dialog input{ width:100%; box-sizing:border-box; margin-top:8px; padding:9px 11px;
+    border:1px solid var(--line-strong); border-radius:8px; font:inherit; background:var(--surface); color:var(--text); }
+  .group-dialog p{ font-size:12px; color:var(--text-2); line-height:1.6; }
+  .group-dialog .group-error{ color:var(--danger-text); }
+  .group-dialog .group-buttons{ display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+  .groupdiv button:focus-visible,.group-dialog input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
   /* 拖着进行中的项目靠过来：分隔行泛绿，完成组最后浮出落点框 */
   .donediv.over{ background:color-mix(in srgb, #34C759 10%, var(--surface)); }
   .donediv.over .hint{ display:none; }
@@ -943,6 +964,20 @@
   </div>
 </div>
 
+<dialog class="group-dialog" id="groupDialog" aria-labelledby="groupDialogTitle">
+  <form id="groupForm">
+    <h2 id="groupDialogTitle">新增分组</h2>
+    <label for="groupName">分组名称</label>
+    <input id="groupName" type="text" maxlength="40" autocomplete="off" placeholder="例如：待启动、暂缓" aria-describedby="groupHelp groupError">
+    <p id="groupHelp">分组只用于本月。建好后，把项目拖到分组标题下即可归组。</p>
+    <p class="group-error" id="groupError" role="alert" hidden></p>
+    <div class="group-buttons">
+      <button class="btn" type="button" id="groupCancel">取消</button>
+      <button class="btn primary" type="submit" id="groupSave">新增分组</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- 右键菜单 -->
 <div id="ctx"></div>
 
@@ -1239,6 +1274,11 @@ function migrate(s){
   if(!s.view) s.view={year:today.getFullYear(),month:today.getMonth()+1};
   Object.keys(s.months).forEach(function(k){
     var md=s.months[k]; if(!md.projects) md.projects=[]; if(!md.weekNotes) md.weekNotes={};
+    var seen=Object.create(null);
+    md.groups=(Array.isArray(md.groups)?md.groups:[]).filter(function(g){
+      if(!g || typeof g.id!=="string" || !g.id || g.id==="_done" || typeof g.name!=="string" || !g.name.trim() || seen[g.id]) return false;
+      seen[g.id]=true; g.name=g.name.trim(); return true;
+    });
     if(typeof md.colorSeq!=="number") md.colorSeq=md.projects.length;
     md.projects.forEach(function(p){ if(!p.weeks) p.weeks={}; if(!p.id) p.id=uid(); });
   });
@@ -1250,11 +1290,60 @@ function save(){ persist(); }          /* 先存浏览器一份，再写进数�
 /* 当月数据（不存在则新建） */
 function monthData(y,m,create){
   var k=y+"-"+m;
-  if(!state.months[k]){ if(create) state.months[k]={projects:[],weekNotes:{},colorSeq:0}; else return {projects:[],weekNotes:{},colorSeq:0}; }
+  if(!state.months[k]){ if(create) state.months[k]={projects:[],groups:[],weekNotes:{},colorSeq:0}; else return {projects:[],groups:[],weekNotes:{},colorSeq:0}; }
   return state.months[k];
 }
 function curMonth(){ return monthData(state.view.year, state.view.month, true); }
 function projById(id){ var ps=curMonth().projects; for(var i=0;i<ps.length;i++) if(ps[i].id===id) return ps[i]; return null; }
+
+/* 自定义分组按月保存；没有分组或分组已移除的项目仍显示在进行中。 */
+function monthGroups(md){ return Array.isArray(md.groups)?md.groups:[]; }
+function activeGroupName(md){ return typeof md.activeGroupName==="string" && md.activeGroupName.trim() ? md.activeGroupName.trim() : "进行中"; }
+function projectGroup(p,md){
+  return monthGroups(md).some(function(g){ return g.id===p.groupId; }) ? p.groupId : "";
+}
+function projectSection(p,md){ return p.done?"_done":projectGroup(p,md); }
+var editingGroupId=null;
+function openGroupEditor(group){
+  editingGroupId=group?group.id:null;
+  document.getElementById("groupDialogTitle").textContent=group?"修改分组名称":"新增分组";
+  document.getElementById("groupSave").textContent=group?"保存名称":"新增分组";
+  document.getElementById("groupName").value=group?group.name:"";
+  document.getElementById("groupHelp").textContent=group?"只修改本月分组名称，项目状态、周安排和备注不变。":"分组只用于本月。建好后，把项目拖到分组标题下即可归组。";
+  document.getElementById("groupError").hidden=true;
+  document.getElementById("groupName").removeAttribute("aria-invalid");
+  document.getElementById("groupDialog").showModal();
+  document.getElementById("groupName").focus();
+}
+function saveGroupName(){
+  var md=curMonth(), name=document.getElementById("groupName").value.trim(), groups=monthGroups(md), error="";
+  var renaming=editingGroupId!==null, isDefault=editingGroupId==="";
+  var group=groups.find(function(g){ return g.id===editingGroupId; });
+  if(!name) error="请填写分组名称，例如：待启动。";
+  else if(name.length>40) error="分组名称最多40个字，请缩短后再保存。";
+  else if(name==="已完成" || (!isDefault && name===activeGroupName(md)) || groups.some(function(g){ return g.id!==editingGroupId && g.name===name; })) error="本月已有这个分组名称，请换一个名称。";
+  else if(renaming && !isDefault && !group) error="这个分组已被移除，请取消后重新新增。";
+  var hint=document.getElementById("groupError"); hint.textContent=error; hint.hidden=!error;
+  if(error){ document.getElementById("groupName").setAttribute("aria-invalid","true"); document.getElementById("groupName").focus(); return false; }
+  if(isDefault){ md.activeGroupName=name; group={id:"",name:name}; }
+  else if(group) group.name=name;
+  else{ group={id:uid(),name:name}; md.groups=groups.concat([group]); }
+  save(); render(); document.getElementById("groupDialog").close();
+  var divider=[].slice.call(document.querySelectorAll("#grid .groupdiv")).find(function(n){ return n.dataset.group===group.id; });
+  if(divider){
+    divider.querySelector(".dl").scrollIntoView({block:"nearest",inline:"nearest"});
+    divider.querySelector("button").focus({preventScroll:true});
+  }
+  toast(renaming?"分组名称已保存":"已新增分组，可拖入项目");
+  return true;
+}
+function removeGroup(group){
+  if(!confirm("移除分组「"+group.name+"」？组内未完成项目会放回「"+activeGroupName(curMonth())+"」，项目、周安排和备注都会保留。")) return;
+  var md=curMonth();
+  md.groups=monthGroups(md).filter(function(g){ return g.id!==group.id; });
+  md.projects.forEach(function(p){ if(p.groupId===group.id) delete p.groupId; });
+  save(); render(); toast("分组已移除，项目和安排已保留");
+}
 
 /* ================= 生成某月的周列 ================= */
 function buildColumns(year, month){
@@ -1420,7 +1509,12 @@ function renderGrid(){
 
   /* 表头行 */
   var corner=el("div","corner");
-  corner.appendChild(el("div","corner-title","项目 ＼ 周"));
+  var heading=el("div","corner-heading");
+  heading.appendChild(el("div","corner-title","项目 ＼ 周"));
+  var addGroup=el("button","btn ghost add-group","＋ 分组"); addGroup.id="addGroup"; addGroup.type="button";
+  addGroup.title="新增本月分组"; addGroup.setAttribute("aria-label","新增分组");
+  addGroup.addEventListener("click",function(){ openGroupEditor(null); });
+  heading.appendChild(addGroup); corner.appendChild(heading);
   corner.appendChild(el("div","corner-count", md.projects.length+" 项目 · "+cols.length+" 周"));
   var rz=el("div","resizer"); rz.title="拖动调整列宽"; rz.addEventListener("pointerdown",startResize);
   corner.appendChild(rz);
@@ -1460,13 +1554,27 @@ function renderGrid(){
     grid.appendChild(wn);
   });
 
-  /* 每个项目一行：进行中的在上，"已完成"分隔行，完成的在下 */
-  var actives=md.projects.filter(function(p){ return !p.done; });
+  /* 进行中、自定义分组、已完成；分组不改变项目的完成状态和编辑样式。 */
+  var groups=monthGroups(md);
   var dones  =md.projects.filter(function(p){ return  p.done; });
-  actives.concat([null], dones).forEach(function(p){
-    if(p===null){ if(md.projects.length) grid.appendChild(doneDivider(dones.length)); return; }
+  var rows=[];
+  rows.push({divider:true,id:"",name:activeGroupName(md)});
+  rows=rows.concat(md.projects.filter(function(p){ return !p.done && !projectGroup(p,md); }));
+  groups.forEach(function(g){
+    rows.push({divider:true,id:g.id,name:g.name,group:g});
+    rows=rows.concat(md.projects.filter(function(p){ return !p.done && projectGroup(p,md)===g.id; }));
+  });
+  if(md.projects.length || groups.length) rows.push({divider:true,id:"_done"});
+  rows=rows.concat(dones);
+  rows.forEach(function(p){
+    if(p.divider){
+      if(p.id==="_done") grid.appendChild(doneDivider(dones.length));
+      else grid.appendChild(groupDivider(p,md.projects.filter(function(q){ return !q.done && projectGroup(q,md)===p.id; }).length));
+      return;
+    }
     var lab=el("div","cell rlabel proj stickyleft"+(p.done?" done":""));
-    lab.dataset.pid=p.id; lab.title="拖动排序（拖到“已完成”下面就记为完成） · 点色块改色 · 双击改名 · 右键更多操作";
+    lab.dataset.pid=p.id; lab.dataset.group=projectSection(p,md);
+    lab.title="拖动排序或移入分组（拖到“已完成”下面就记为完成） · 点色块改色 · 双击改名 · 右键更多操作";
 
     /* 拖动手柄（悬浮显现） */
     var grip=el("span","grip"); grip.innerHTML=GRIP_SVG; grip.title="按住拖动排序";
@@ -1546,9 +1654,30 @@ function renderGrid(){
 /* "已完成"分隔行：也是拖进完成的落点 */
 function doneDivider(n){
   var dv=el("div","donediv");
+  dv.dataset.group="_done";
   dv.innerHTML='<span class="dl"><i>✓</i>已完成<span class="dn">'+n+'</span>'+
     '<span class="hint">'+(n?'':'把做完的项目拖到这里')+'</span></span>';
   return dv;
+}
+
+function groupDivider(section,n){
+  var dv=el("div","donediv groupdiv"); dv.dataset.group=section.id;
+  var label=el("span","dl");
+  var name=el("span","group-name",section.name); name.title=section.name;
+  label.appendChild(name); label.appendChild(el("span","dn",String(n)));
+  var rename=el("button","group-action"); rename.type="button"; rename.title="修改分组名称";
+  rename.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 3 5 5-13 13H3v-5L16 3Z M14 5l5 5"/></svg>';
+  rename.setAttribute("aria-label","修改分组「"+section.name+"」的名称");
+  rename.addEventListener("click",function(){ openGroupEditor(section.group||{id:"",name:section.name}); });
+  label.appendChild(rename);
+  if(section.group){
+    var remove=el("button","group-action remove-group"); remove.type="button";
+    remove.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18 M9 6V4h6v2 M5 6l1 14h12l1-14 M10 10v6 M14 10v6"/></svg>';
+    remove.title="移除分组，保留项目"; remove.setAttribute("aria-label","移除分组「"+section.name+"」，保留项目");
+    remove.addEventListener("click",function(){ removeGroup(section.group); }); label.appendChild(remove);
+  }
+  if(!n) label.appendChild(el("span","hint","把项目拖到这里"));
+  dv.appendChild(label); return dv;
 }
 
 /* 备注文字：格子窄到连第一个字都放不下时干脆不显示，鼠标悬停仍能看到全文 */
@@ -1680,7 +1809,7 @@ function gShowSlot(show){
 function gSnap(){
   var m={};
   [].forEach.call(document.querySelectorAll("#grid .rlabel.proj, #grid .donediv"), function(n){
-    m[n.dataset.pid||"_div"]=n.getBoundingClientRect().top;
+    m[n.dataset.pid||"_div_"+n.dataset.group]=n.getBoundingClientRect().top;
   });
   return m;
 }
@@ -1688,10 +1817,10 @@ function gFlip(olds, skipPid){
   if(noMotion()) return;
   var tops={};
   [].forEach.call(document.querySelectorAll("#grid .rlabel.proj, #grid .donediv"), function(n){
-    tops[n.dataset.pid||"_div"]=n.getBoundingClientRect().top;
+    tops[n.dataset.pid||"_div_"+n.dataset.group]=n.getBoundingClientRect().top;
   });
   [].forEach.call(document.querySelectorAll("#grid [data-pid], #grid .donediv"), function(n){
-    var k=n.dataset.pid||"_div";
+    var k=n.dataset.pid||"_div_"+n.dataset.group;
     if(!(k in olds) || !(k in tops)) return;
     if(k===skipPid){                            /* 被拖的那行：名字由纸片落进去，色条淡入 */
       if(!n.classList.contains("pcell")) return;
@@ -1727,24 +1856,28 @@ function gCelebrate(pid){
   document.body.appendChild(ov);
   setTimeout(function(){ if(ov.parentNode) ov.parentNode.removeChild(ov); }, 1800);
 }
-/* 指针过了"已完成"分隔行的一半就算放进完成组，组内再按行的上下半决定插在哪 */
+/* 按分隔行确定落入哪组；空组的标题整行也可以接收项目。 */
 function updateDrop(ev){
-  var dv=document.querySelector("#grid .donediv");
-  var dr=dv ? dv.getBoundingClientRect() : null;
-  var toDone=!!dr && ev.clientY >= dr.top + dr.height/2;
-  var labs=[].slice.call(document.querySelectorAll("#grid .rlabel.proj"+(toDone?".done":":not(.done)")));
+  var divs=[].slice.call(document.querySelectorAll("#grid .donediv")), section="", divider=null;
+  divs.forEach(function(d){
+    var r=d.getBoundingClientRect();
+    if(ev.clientY>=r.top){ section=d.dataset.group; divider=d; }
+    d.classList.remove("over");
+  });
+  var toDone=section==="_done", dr=divider?divider.getBoundingClientRect():null;
+  var labs=rowLabels().filter(function(n){ return n.dataset.group===section; });
   var insertIdx=labs.length, y;
   for(var i=0;i<labs.length;i++){
     var r=labs[i].getBoundingClientRect();
     if(ev.clientY < r.top + r.height/2){ insertIdx=i; break; }
   }
-  rowDrag.insertIdx=insertIdx; rowDrag.toDone=toDone;
+  rowDrag.insertIdx=insertIdx; rowDrag.toDone=toDone; rowDrag.groupId=toDone?"":section;
   if(insertIdx<labs.length) y=labs[insertIdx].getBoundingClientRect().top;
   else if(labs.length)      y=labs[labs.length-1].getBoundingClientRect().bottom;
-  else                      y=toDone ? dr.bottom : dr.top;          /* 这一组还是空的 */
+  else y=dr?dr.bottom:document.getElementById("grid").getBoundingClientRect().bottom;
   var dragged=projById(rowDrag.id);
   var near=toDone && !!dragged && !dragged.done;
-  if(dv) dv.classList.toggle("over", near);
+  if(divider) divider.classList.toggle("over",true);
   gShowSlot(near);
   overZone=near;                                  /* 快放进完成了：纸片放平一点、准备落下 */
   /* 要落在完成组最后时，落点框本身就是目标，不再画插入线 */
@@ -1755,29 +1888,37 @@ function updateDrop(ev){
   dropInd.style.top=(y-1)+"px";
 }
 /* 放进进行中 / 已完成组的第 insertIdx 个位置（下标按该组现有的行算，含被拖的那行） */
-function moveProjectTo(dragId, insertIdx, toDone){
+function moveProjectTo(dragId, insertIdx, toDone, groupId){
   var md=curMonth(), p=projById(dragId);
   if(!p) return false;
-  var wasDone=!!p.done;
-  var group=md.projects.filter(function(q){ return !!q.done===!!toDone; });
+  var wasDone=!!p.done, oldGroup=projectGroup(p,md);
+  if(!toDone && groupId==null) groupId=oldGroup;
+  if(!toDone && groupId && !monthGroups(md).some(function(g){ return g.id===groupId; })) return false;
+  var section=toDone?"_done":(groupId||"");
+  var group=md.projects.filter(function(q){ return projectSection(q,md)===section; });
   var from=group.indexOf(p);
   var to=insertIdx; if(from>=0 && from<insertIdx) to--;   // 移除自身后目标索引前移
   if(from>=0) group.splice(from,1);
   to=Math.max(0,Math.min(group.length,to));
-  if(wasDone===!!toDone && to===from) return false;
+  if(wasDone===!!toDone && (toDone || oldGroup===groupId) && to===from) return false;
   group.splice(to,0,p);
   if(toDone && !wasDone){ p.done=true; p.doneAt=Date.now(); gJustDone=p.id; }
   if(!toDone && wasDone){ delete p.done; delete p.doneAt; }
-  var other=md.projects.filter(function(q){ return q!==p && !!q.done!==!!toDone; });
+  if(!toDone){ if(groupId) p.groupId=groupId; else delete p.groupId; }
+  var other=md.projects.filter(function(q){ return q!==p && projectSection(q,md)!==section; });
   md.projects = toDone ? other.concat(group) : group.concat(other);
-  if(wasDone!==!!toDone) toast(toDone ? "「"+p.name+"」已完成" : "「"+p.name+"」已放回进行中");
+  if(wasDone!==!!toDone || (!toDone && oldGroup!==groupId)){
+    var target=monthGroups(md).find(function(g){ return g.id===groupId; });
+    toast(toDone ? "「"+p.name+"」已完成" : "「"+p.name+"」已移到「"+(target?target.name:activeGroupName(md))+"」");
+  }
   return true;
 }
 /* 右键：标记完成放到完成组最后，恢复则放到进行中最后 */
 function setProjectDone(p, done){
-  var n=curMonth().projects.filter(function(q){ return !!q.done===!!done; }).length;
+  var md=curMonth(), groupId=projectGroup(p,md), section=done?"_done":groupId;
+  var n=md.projects.filter(function(q){ return projectSection(q,md)===section; }).length;
   var olds=gSnap();
-  if(moveProjectTo(p.id, n, done)){
+  if(moveProjectTo(p.id, n, done, groupId)){
     save(); renderGrid(); gFlip(olds, "");
     if(gJustDone===p.id) gCelebrate(p.id);
   }
@@ -1796,13 +1937,14 @@ document.addEventListener("pointermove",function(ev){
   rowRaf=true; rowDrag._ev=ev;
   requestAnimationFrame(function(){ rowRaf=false; if(rowDrag&&rowDrag._ev) updateDrop(rowDrag._ev); });
 });
-document.addEventListener("pointerup",function(){
+document.addEventListener("pointerup",function(ev){
   if(!rowDrag) return;
+  if(rowDrag.started) updateDrop(ev);
   var rd=rowDrag; rowDrag=null; document.body.style.cursor="";
   if(dropInd){ dropInd.style.display="none"; dropInd.style.visibility=""; }
   if(rd.started){                                           // 松手才重建一次
     var olds=gSnap();
-    moveProjectTo(rd.id, rd.insertIdx, rd.toDone); save();
+    moveProjectTo(rd.id, rd.insertIdx, rd.toDone, rd.groupId); save();
     gShowSlot(false); renderGrid();
     gFlip(olds, rd.id);
     var g=paper; paper=null;
@@ -1824,7 +1966,8 @@ document.addEventListener("pointerup",function(){
 /* ================= 右键菜单 ================= */
 function openCtx(x,y,proj){
   var ctx=document.getElementById("ctx"); ctx.innerHTML="";
-  var fin=el("button","", proj.done ? "↺  恢复为进行中" : "✓  标记完成");
+  var restoreGroup=monthGroups(curMonth()).find(function(g){ return g.id===projectGroup(proj,curMonth()); });
+  var fin=el("button","", proj.done ? "↺  恢复到「"+(restoreGroup?restoreGroup.name:activeGroupName(curMonth()))+"」" : "✓  标记完成");
   fin.addEventListener("click",function(){ closeCtx(); setProjectDone(proj, !proj.done); });
   ctx.appendChild(fin);
   if(!proj.done){                                   /* 完成了的项目不再顺延到下月 */
@@ -1912,6 +2055,9 @@ document.getElementById("addP").addEventListener("click",function(){
   md.projects.push({ id:uid(), name:name, color:color, weeks:{} });
   save(); render(); toast("已在 "+state.view.year+"年"+state.view.month+"月 新建「"+name+"」");
 });
+
+document.getElementById("groupForm").addEventListener("submit",function(ev){ ev.preventDefault(); saveGroupName(); });
+document.getElementById("groupCancel").addEventListener("click",function(){ document.getElementById("groupDialog").close(); });
 document.getElementById("weekStartBtn").addEventListener("click",function(){ setWeekStart(!state.mondayStart); save(); render(); });
 
 /* 主题 */
@@ -1972,6 +2118,8 @@ var THREAD_KEY = "open-project-board-demo-thread-v1";
 var tstate = loadThread();
 var viewDay = dayKey(new Date());       /* 当前在看哪一天 */
 var tickTimer = null;
+var threadDay = viewDay;                /* 上次同步时的真实日期，与历史查看日期分开 */
+var threadDayWatch = null, threadResuming = false;
 var calYM = { y:today.getFullYear(), m:today.getMonth()+1 };
 
 function loadThread(){
@@ -2153,9 +2301,48 @@ function closeSeg(it, at){
   if(g && !g.e) g.e=Math.max(g.s,at==null?Date.now():at);
 }
 
+/* 显示和操作当天事项前统一接续；文件未连上或正在同步时留待下次重试。 */
+function syncThreadDay(forceToday){
+  if(!fsx || !fsx.ready || fsx.busy || document.getElementById("fsconf")) return 0;
+  if(dragId || (document.activeElement && document.activeElement.isContentEditable)) return 0;
+  var tk=todayKey();
+  if(forceToday || (tk!==threadDay && viewDay===threadDay)) viewDay=tk;
+  threadDay=tk;
+  return carryOver();
+}
+/* 旧页面上的卡片可能已经属于昨天，不能继续修改它捕获的历史对象。 */
+function canEditThreadItem(it){
+  if(!fsx || !fsx.ready) return true;
+  if(document.getElementById("fsconf")) return false;
+  syncThreadDay(false);
+  if(isToday(viewDay) && (dayOf(viewDay).items||[]).indexOf(it)>=0) return true;
+  if(fsx.busy){ toast("正在同步数据，请稍后再操作今天的事项"); return false; }
+  renderToday();
+  toast("日期已变化，请在今天的事项上重新操作");
+  return false;
+}
+async function resumeThreadDay(){
+  if(!fsx || !fsx.ready || document.hidden || threadResuming) return;
+  threadResuming=true;
+  try{
+    await checkDisk();
+    if(!fsx.ready) return;
+    var before=threadDay, moved=syncThreadDay(false);
+    if(!document.getElementById("viewToday").hidden && (before!==threadDay || moved)) renderToday();
+    if(moved) toast("之前未完成的 "+moved+" 件事项已带到今天，计时已暂停");
+  }finally{ threadResuming=false; }
+}
+function startThreadDayWatch(){
+  if(threadDayWatch!==null) return;
+  threadDayWatch=setInterval(function(){
+    if(todayKey()!==threadDay) return resumeThreadDay();
+  },1000);
+}
+
 /* ---------- 增删改 ---------- */
 function addItem(text, start){
   text=(text||"").trim(); if(!text) return null;
+  syncThreadDay(true);                    /* 先接续旧事项，再追加新事项，避免暂停新计时 */
   var tk=todayKey(), d=dayOf(tk,true);
   var it={ id:uid(), text:text, at:Date.now(), segs:[], running:false, done:false, doneAt:null,
            carried:false, from:tk, zone:(start?"doing":"todo"), ord:0 };
@@ -2173,6 +2360,7 @@ function findItem(k, id){
   return null;
 }
 function startItem(it){
+  if(!canEditThreadItem(it)) return;
   if(it.done || it.running) return;
   var now=Date.now();
   if(!getSettings().parallel) pauseOtherRunning(it,now);
@@ -2180,10 +2368,12 @@ function startItem(it){
   it.zone="doing"; justStart=it.id; saveThread(); renderToday();
 }
 function pauseItem(it){
+  if(!canEditThreadItem(it)) return;
   if(!it.running) return;
   closeSeg(it); it.running=false; saveThread(); renderToday();
 }
 function doneItem(it){
+  if(!canEditThreadItem(it)) return;
   if(it.done) return;
   justDone=it.id;
   flyTo(it.id, function(){
@@ -2193,6 +2383,7 @@ function doneItem(it){
   setTimeout(checkAllDone, 420);               /* 等它落定再撒纸屑 */
 }
 function delItem(k, id){
+  var it=findItem(k,id); if(!it || !canEditThreadItem(it)) return;
   var d=dayOf(k); d.items=d.items.filter(function(x){ return x.id!==id; }); saveThread(); renderToday();
 }
 
@@ -2205,6 +2396,7 @@ function seen(id){
   seenIds[id]=1; return false;
 }
 function renderToday(){
+  syncThreadDay(false);
   var live = isToday(viewDay);
   document.getElementById("addInput").placeholder = getSettings().enterAction==="todo"
     ? "现在要做什么？回车＝记一笔，先不计时" : "现在要做什么？回车＝开始做并计时";
@@ -2314,6 +2506,7 @@ function makeRenamable(tx, holder, it){
   tx.title="双击改名";
   tx.addEventListener("dblclick",function(ev){
     ev.stopPropagation();
+    if(!canEditThreadItem(it)) return;
     holder.draggable=false;                      /* 编辑时先别让它跑 */
     tx.contentEditable="true"; tx.spellcheck=false; tx.classList.add("editing"); tx.focus();
     var r=document.createRange(); r.selectNodeContents(tx);
@@ -2550,6 +2743,7 @@ function setNearDone(v){
 function makeDraggable(node, it){
   node.draggable=true;
   node.addEventListener("dragstart",function(ev){
+    if(!canEditThreadItem(it)){ ev.preventDefault(); return; }
     dragId=it.id; dropHandled=false; landId=""; nearDone=false;
     ev.dataTransfer.effectAllowed="move";
     try{ ev.dataTransfer.setData("text/plain", it.id); }catch(e){}
@@ -2661,6 +2855,8 @@ function clearDrop(){
 
 /* 拖到哪个区，就变成那个区的状态 */
 function moveItem(id, zkey, idx, fly){
+  var previous=findItem(viewDay,id);
+  if(!previous || !canEditThreadItem(previous)) return;
   if(!isToday(viewDay)) return;
   var d=dayOf(viewDay), it=findItem(viewDay, id);
   if(!it) return;
@@ -2864,7 +3060,7 @@ function renderCal(){
     var has=rec && rec.items && rec.items.length;
     var b=el("button","calday"+(inM?"":" other")+(has?" has":"")+(k===viewDay?" sel":"")+(k===tk?" td":""), String(d.getDate()));
     if(has) b.title=rec.items.length+" 件事";
-    (function(kk){ b.addEventListener("click",function(){ viewDay=kk; closeCal(); renderToday(); }); })(k);
+    (function(kk){ b.addEventListener("click",function(){ syncThreadDay(false); viewDay=kk; closeCal(); renderToday(); }); })(k);
     g.appendChild(b);
   }
 }
@@ -2922,21 +3118,13 @@ document.getElementById("calPrev").addEventListener("click",function(){
 document.getElementById("calNext").addEventListener("click",function(){
   calYM.m++; if(calYM.m>12){ calYM.m=1; calYM.y++; } renderCal();
 });
-document.getElementById("backToday").addEventListener("click",function(){ viewDay=todayKey(); renderToday(); });
+document.getElementById("backToday").addEventListener("click",function(){ syncThreadDay(true); viewDay=todayKey(); renderToday(); });
 document.addEventListener("pointerdown",function(ev){
   var cp=document.getElementById("calpop");
   if(cp.style.display==="block" && !cp.contains(ev.target) && ev.target.id!=="calBtn"){ closeCal(); }
 });
 /* 电脑休眠或换了一天后回来，自动对齐到今天 */
-document.addEventListener("visibilitychange",async function(){
-  if(document.hidden) return;
-  if(fsx.ready) await checkDisk();
-  if(!fsx.ready) return;
-  if(document.getElementById("viewToday").hidden) return;
-  var moved=carryOver();
-  if(moved){ viewDay=todayKey(); toast("昨天还有 "+moved+" 件没做完，已带到今天（已暂停计时）"); }
-  renderToday();
-});
+document.addEventListener("visibilitychange",resumeThreadDay);
 
 ZONES.forEach(function(z){
   if(z.key!=="done") bindZone(document.getElementById("zone-"+z.key), z.key);
@@ -3079,7 +3267,9 @@ document.getElementById("demoYesterday").addEventListener("click",function(){
   viewDay="2026-10-18"; switchView("today");
 });
 render();
-carryOver();
+syncThreadDay(false);
+startThreadDayWatch();
+window.addEventListener("focus",resumeThreadDay);
 applyMotionPreference();
 switchView(getSettings().startView);
 })();

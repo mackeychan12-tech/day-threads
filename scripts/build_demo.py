@@ -230,7 +230,9 @@ document.getElementById("demoYesterday").addEventListener("click",function(){
   viewDay="2026-10-18"; switchView("today");
 });
 render();
-carryOver();
+syncThreadDay(false);
+startThreadDayWatch();
+window.addEventListener("focus",resumeThreadDay);
 applyMotionPreference();
 switchView(getSettings().startView);
 })();

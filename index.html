@@ -137,7 +137,7 @@
   /* ============ 甘特网格 ============ */
   .scroller{ overflow:auto; padding:16px 18px 30px; }
   .grid{
-    display:inline-grid; background:var(--surface); border:1px solid var(--line);
+    position:relative; display:inline-grid; background:var(--surface); border:1px solid var(--line);
     border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); min-width:100%;
   }
   .cell{ border-right:1px solid var(--line); border-bottom:1px solid var(--line); position:relative; }
@@ -216,16 +216,14 @@
   .rlabel .grip svg{ display:block; }
   .rlabel.proj:hover .grip{ opacity:.5; }
   .rlabel .grip:hover{ opacity:.95; color:var(--accent); }
-  /* 拖动中：被拖的整行淡出 + 一条插入位置指示线 */
-  #grid .dragrow{ opacity:.26; transition:opacity .14s ease; }
-  .drop-ind{
-    position:fixed; z-index:50; height:2px; display:none; pointer-events:none;
-    background:var(--accent); border-radius:2px; box-shadow:0 0 8px var(--accent);
+  /* 拖动中收起原行，下方的卡片或项目行给落点让位。 */
+  #grid .dragrow{ display:none; }
+  .drop-placeholder{
+    height:var(--row-h); min-height:var(--row-h); flex:none; pointer-events:none;
+    border:1px dashed var(--accent); border-radius:6px;
+    background:color-mix(in srgb,var(--accent) 24%,var(--accent-soft));
   }
-  .drop-ind::before{
-    content:""; position:absolute; left:-3px; top:-3px; width:8px; height:8px;
-    border-radius:50%; background:var(--accent); box-shadow:0 0 6px var(--accent);
-  }
+  #grid > .drop-placeholder{ grid-column:1 / -1; margin-inline:6px; }
   .rlabel .dot{
     width:13px; height:13px; border-radius:4px; flex:none; position:relative; cursor:pointer;
     box-shadow:inset 0 0 0 1px rgba(0,0,0,.16), 0 0 0 2px transparent; transition:box-shadow .12s;
@@ -314,7 +312,7 @@
   /* 落点框：和今日线程同一个样子，横跨整张表 */
   .doneslot.gslot{ grid-column:1 / -1; margin:6px 8px; }
 
-  /* 拖动时手里那张"纸"：只拿起左边的项目名，色条留在原地淡出 */
+  /* 拖动时手里那张"纸"只显示左边的项目名。 */
   .rlabel.proj.gpaper{
     border:1px solid var(--line-strong); border-radius:10px; background:var(--surface);
     box-shadow:0 26px 54px rgba(20,18,36,.46), 0 4px 12px rgba(20,18,36,.3);
@@ -585,7 +583,7 @@
   .zonehead .zn{ font-size:11.5px; color:var(--text-3); font-variant-numeric:tabular-nums; }
   .zonehead .zline{ flex:1; height:1px; background:linear-gradient(90deg, var(--line), transparent); }
   .zonebody{
-    display:flex; flex-direction:column; gap:7px; min-height:52px;
+    position:relative; display:flex; flex-direction:column; gap:7px; min-height:52px;
     border-radius:14px; padding:3px; margin:0 -3px;   /* 负边距抵消内边距，卡片跟输入框左对齐 */
     transition:background .16s, box-shadow .16s;
   }
@@ -600,16 +598,6 @@
     background:color-mix(in srgb, var(--surface) 42%, transparent);
   }
   .zempty b{ color:var(--text-2); font-weight:600; }
-  /* 插入位置指示线 */
-  .dropline{
-    height:2px; background:var(--accent); border-radius:2px; flex:none;
-    box-shadow:0 0 7px var(--accent);
-  }
-  .dropline::before{
-    content:""; float:left; margin:-3px 0 0 -3px; width:8px; height:8px;
-    border-radius:50%; background:var(--accent);
-  }
-
   /* 拖到完成区附近：整块泛绿，末尾浮出一个"落点框" */
   #zone-done.over{
     background:color-mix(in srgb, #34C759 7%, transparent);
@@ -664,8 +652,10 @@
 
   /* 可拖动的卡片 */
   .dragitem{ cursor:grab; }
-  /* 拖走后原地留下的空位：淡下去、略微收一点 */
-  .dragitem.dragging{ opacity:.26; cursor:grabbing; transform:scale(.99); }
+  /* 保留浏览器拖放所需的源节点，但让它离开列表布局。 */
+  .dragitem.dragging{ position:absolute !important; visibility:hidden; pointer-events:none; }
+  /* 拖动时由整个区接收事件，经过鼠标的卡片不会打断拖放。 */
+  #viewToday:has(.zonebody > .dragging) .zonebody > *{ pointer-events:none; }
   /* 跟着鼠标走的那张"纸"：顺时针歪着，走起来还会甩。
      角度由脚本按拖动速度实时算，这里只管质感 */
   .dragpaper{
@@ -1719,8 +1709,43 @@ document.addEventListener("pointerup",function(){
   if(resizing){ resizing=null; document.body.style.cursor=""; save(); }
 });
 
-/* ================= 拖动项目行调顺序（全程零重建，松手才落位） ================= */
-var rowDrag=null, dropInd=null;
+function makeDropPlaceholder(){
+  var slot=el("div","drop-placeholder");
+  slot.setAttribute("aria-hidden","true");
+  return slot;
+}
+
+var dragSlides=new WeakMap();
+function stopDragSlide(node){
+  var slide=dragSlides.get(node);
+  if(slide){ slide.cancel(); dragSlides.delete(node); }
+}
+/* 从眼下显示的位置滑向让位后的布局，快速改方向也从当前画面接着滑。 */
+function slideDragRows(nodes, change){
+  if(noMotion()){ nodes.forEach(stopDragSlide); change(); return; }
+  var positions=[];
+  nodes.forEach(function(n){
+    if(n.offsetHeight) positions.push({node:n, top:n.getBoundingClientRect().top});
+  });
+  change();
+  var moved=positions.filter(function(p){
+    return p.node.offsetHeight && !p.node.classList.contains("dragging") &&
+      Math.abs(p.node.getBoundingClientRect().top-p.top)>.5;
+  });
+  moved.forEach(function(p){ stopDragSlide(p.node); });
+  moved.forEach(function(p){ p.dy=p.top-p.node.getBoundingClientRect().top; });
+  moved.forEach(function(p){
+    if(Math.abs(p.dy)<.5) return;
+    var slide=p.node.animate([{translate:"0 "+p.dy+"px"},{translate:"0 0px"}],{
+      duration:190, easing:"cubic-bezier(.22,.75,.24,1)", fill:"backwards"
+    });
+    dragSlides.set(p.node,slide);
+    slide.onfinish=function(){ if(dragSlides.get(p.node)===slide) dragSlides.delete(p.node); };
+  });
+}
+
+/* ================= 拖动项目行调顺序（松手才重画） ================= */
+var rowDrag=null, rowDrop=null;
 function onRowDragDown(ev,p){
   if(ev.button!==0) return;
   if(ev.target.isContentEditable) return;      // 正在改名
@@ -1729,16 +1754,21 @@ function onRowDragDown(ev,p){
   document.body.style.cursor="grabbing";
 }
 function rowLabels(){ return [].slice.call(document.querySelectorAll("#grid .rlabel.proj")); }
+function slideProjectRows(change){
+  slideDragRows(document.querySelectorAll("#grid [data-pid]:not(.dragrow), #grid .donediv"),change);
+}
 function beginRowDrag(ev){
   rowDrag.started=true;
   var lab=document.querySelector('#grid .rlabel.proj[data-pid="'+rowDrag.id+'"]');
-  var els=document.querySelectorAll('#grid [data-pid="'+rowDrag.id+'"]');   // 整行淡出
+  var r=lab && !noMotion() ? lab.getBoundingClientRect() : null;
+  var els=document.querySelectorAll('#grid [data-pid="'+rowDrag.id+'"]');
   for(var i=0;i<els.length;i++) els[i].classList.add("dragrow");
-  if(!dropInd){ dropInd=document.createElement("div"); dropInd.className="drop-ind"; document.body.appendChild(dropInd); }
-  dropInd.style.display="block";
+  if(lab){
+    if(!rowDrop) rowDrop=makeDropPlaceholder();
+    lab.before(rowDrop);                          // 起拖的空位先承接原行，避免分组标题突然移到光标下方
+  }
   /* 和今日线程一样：把项目名那一块拿起来，歪着跟手 */
-  if(lab && !noMotion()){
-    var r=lab.getBoundingClientRect();
+  if(r){
     paperDX=rowDrag.startX-r.left; paperDY=rowDrag.startY-r.top;
     paper=lab.cloneNode(true);
     paper.classList.remove("dragrow","stickyleft");
@@ -1826,34 +1856,38 @@ function gCelebrate(pid){
 }
 /* 按分隔行确定落入哪组；空组的标题整行也可以接收项目。 */
 function updateDrop(ev){
-  var divs=[].slice.call(document.querySelectorAll("#grid .donediv")), section="", divider=null;
-  divs.forEach(function(d){
-    var r=d.getBoundingClientRect();
-    if(ev.clientY>=r.top){ section=d.dataset.group; divider=d; }
-    d.classList.remove("over");
-  });
-  var toDone=section==="_done", dr=divider?divider.getBoundingClientRect():null;
+  var grid=document.getElementById("grid"), divs=grid.querySelectorAll(".donediv");
+  var y=ev.clientY-grid.getBoundingClientRect().top-grid.clientTop;
+  var divider=divs[0], nextDivider=null;
+  for(var j=1;j<divs.length;j++){
+    var d=divs[j];
+    if(y<d.offsetTop){ nextDivider=d; break; }
+    divider=d;
+  }
+  var section=divider?divider.dataset.group:"";
+  var toDone=section==="_done";
   var labs=rowLabels().filter(function(n){ return n.dataset.group===section; });
-  var insertIdx=labs.length, y;
+  var insertIdx=labs.length;
   for(var i=0;i<labs.length;i++){
-    var r=labs[i].getBoundingClientRect();
-    if(ev.clientY < r.top + r.height/2){ insertIdx=i; break; }
+    if(labs[i].dataset.pid===rowDrag.id) continue;   // 跳过收起的原行，保留保存顺序所用的下标
+    if(y<labs[i].offsetTop+labs[i].offsetHeight/2){ insertIdx=i; break; }
   }
   rowDrag.insertIdx=insertIdx; rowDrag.toDone=toDone; rowDrag.groupId=toDone?"":section;
-  if(insertIdx<labs.length) y=labs[insertIdx].getBoundingClientRect().top;
-  else if(labs.length)      y=labs[labs.length-1].getBoundingClientRect().bottom;
-  else y=dr?dr.bottom:document.getElementById("grid").getBoundingClientRect().bottom;
   var dragged=projById(rowDrag.id);
   var near=toDone && !!dragged && !dragged.done;
-  if(divider) divider.classList.toggle("over",true);
-  gShowSlot(near);
-  overZone=near;                                  /* 快放进完成了：纸片放平一点、准备落下 */
-  /* 要落在完成组最后时，落点框本身就是目标，不再画插入线 */
-  dropInd.style.visibility = (near && insertIdx===labs.length) ? "hidden" : "";
-  var sc=document.querySelector(".scroller").getBoundingClientRect();
-  dropInd.style.left=(sc.left+8)+"px";
-  dropInd.style.width=Math.max(0,sc.width-16)+"px";
-  dropInd.style.top=(y-1)+"px";
+  divs.forEach(function(d){ d.classList.toggle("over",d===divider); });
+  overZone=near;
+  if(!rowDrop) rowDrop=makeDropPlaceholder();
+  var before=labs[insertIdx] || nextDivider;
+  var atDoneSlot=near && insertIdx===labs.length;
+  var atTarget=atDoneSlot ? !rowDrop.parentNode : rowDrop.parentNode===grid && rowDrop.nextElementSibling===before;
+  if(atTarget && !!(gSlot && gSlot.parentNode===grid)===near) return;
+  slideProjectRows(function(){
+    gShowSlot(near);
+    /* 完成组末尾沿用「松手，就记为完成」的落点框。 */
+    if(atDoneSlot) rowDrop.remove();
+    else if(!atTarget) grid.insertBefore(rowDrop,before);
+  });
 }
 /* 放进进行中 / 已完成组的第 insertIdx 个位置（下标按该组现有的行算，含被拖的那行） */
 function moveProjectTo(dragId, insertIdx, toDone, groupId){
@@ -1900,8 +1934,8 @@ document.addEventListener("pointermove",function(ev){
     if(Math.abs(ev.clientY-rowDrag.startY) < 4) return;   // 越过阈值才算拖动，避免误触
     beginRowDrag(ev);
   }
-  if(paper) movePaper(ev.clientX, ev.clientY);            // 纸片每次都跟手，插入线才节流
-  if(rowRaf) { rowDrag._ev=ev; return; }                   // rAF 节流，只更新指示线
+  if(paper) movePaper(ev.clientX, ev.clientY);            // 纸片每次都跟手，占位只在每帧更新
+  if(rowRaf) { rowDrag._ev=ev; return; }
   rowRaf=true; rowDrag._ev=ev;
   requestAnimationFrame(function(){ rowRaf=false; if(rowDrag&&rowDrag._ev) updateDrop(rowDrag._ev); });
 });
@@ -1909,7 +1943,6 @@ document.addEventListener("pointerup",function(ev){
   if(!rowDrag) return;
   if(rowDrag.started) updateDrop(ev);
   var rd=rowDrag; rowDrag=null; document.body.style.cursor="";
-  if(dropInd){ dropInd.style.display="none"; dropInd.style.visibility=""; }
   if(rd.started){                                           // 松手才重建一次
     var olds=gSnap();
     moveProjectTo(rd.id, rd.insertIdx, rd.toDone, rd.groupId); save();
@@ -1929,6 +1962,18 @@ document.addEventListener("pointerup",function(ev){
     gJustDone="";
   }
   /* 纯单击（未越阈值）不重建 DOM，保证双击改名可用 */
+});
+document.addEventListener("pointercancel",function(){
+  if(!rowDrag) return;
+  var started=rowDrag.started;
+  rowDrag=null; document.body.style.cursor="";
+  if(!started) return;
+  slideProjectRows(function(){
+    if(rowDrop) rowDrop.remove();
+    gShowSlot(false);
+    document.querySelectorAll("#grid .dragrow, #grid .donediv.over").forEach(function(n){ n.classList.remove("dragrow","over"); });
+  });
+  landId=""; dropPaper();
 });
 
 /* ================= 右键菜单 ================= */
@@ -2592,7 +2637,9 @@ function flyTo(id, apply, skipId){
   });
   apply();                                     /* 这一步会把整页重画 */
   if(noMotion()) return;
-  Array.prototype.forEach.call(document.querySelectorAll("#viewToday [data-fid]"), function(n){
+  var cards=document.querySelectorAll("#viewToday [data-fid]");
+  cards.forEach(stopDragSlide);
+  cards.forEach(function(n){
     var o=olds[n.dataset.fid];
     if(!o) return;                             /* 全新的一条走它自己的入场动画 */
     if(skipId && n.dataset.fid===skipId) return;   /* 拖过去的那张由纸片落进去，不再自己滑 */
@@ -2615,6 +2662,9 @@ function flyTo(id, apply, skipId){
 
 /* ---------- 拖动 ---------- */
 var dragId=null, dropEl=null, paper=null, paperDX=0, paperDY=0;
+function slideThreadRows(change){
+  slideDragRows(document.querySelectorAll("#viewToday [data-fid]:not(.dragging)"),change);
+}
 /* 纸片的姿态：基础歪 5 度（顺时针），拖快了还会多甩出去一点 */
 var TILT_BASE=5, TILT_SWING=9;
 var tilt=0, swing=0, lastPX=0, lastPT=0, paperRAF=0;
@@ -2731,7 +2781,7 @@ function hideSlot(){
 function setNearDone(v){
   if(v===nearDone) return;
   nearDone=v;
-  if(v) showSlot(); else hideSlot();
+  slideThreadRows(v ? showSlot : hideSlot);
 }
 function makeDraggable(node, it){
   node.draggable=true;
@@ -2743,6 +2793,8 @@ function makeDraggable(node, it){
 
     /* 浏览器默认那个拖影没法调角度，换成自己的一张"纸" */
     var r=node.getBoundingClientRect();
+    if(!dropEl) dropEl=makeDropPlaceholder();
+    dropEl.style.height=r.height+"px";            /* 用原卡高度让分区边界在组内排序时保持稳定 */
     /* 个别情况下事件里没有坐标，就按左上角捏住，别算出 NaN */
     paperDX=(ev.clientX||r.left)-r.left; paperDY=(ev.clientY||r.top)-r.top;
     if(!noMotion()){
@@ -2769,13 +2821,23 @@ function makeDraggable(node, it){
         if(!paperRAF) paperRAF=requestAnimationFrame(paperLoop);
       }, 270);
     }
-    node.classList.add("dragging");
+    /* 原生拖放取好预览后再收起原卡片。 */
+    requestAnimationFrame(function(){
+      if(dragId!==it.id) return;
+      var body=node.parentElement;
+      slideThreadRows(function(){
+        if(body && body.id!=="zone-done" && !dropEl.parentNode) body.insertBefore(dropEl,node.nextElementSibling);
+        node.classList.add("dragging");
+      });
+    });
   });
   node.addEventListener("drag",function(ev){
     if(ev.clientX || ev.clientY) movePaper(ev.clientX, ev.clientY);
   });
   node.addEventListener("dragend",function(){
-    node.classList.remove("dragging"); dragId=null; clearDrop(); dropPaper();
+    dragId=null;
+    slideThreadRows(function(){ node.classList.remove("dragging"); clearDrop(); });
+    dropPaper();
   });
 }
 /* 有些浏览器 drag 事件的坐标不准，用文档上的 dragover 兜底 */
@@ -2794,7 +2856,6 @@ document.addEventListener("drop",function(ev){
   if(nearDone && dragId && !dropHandled){
     ev.preventDefault();
     var id=dragId;
-    clearDrop();
     landId=id;
     moveItem(id, "done", -1);
   }
@@ -2802,47 +2863,53 @@ document.addEventListener("drop",function(ev){
   dragId=null;
 });
 function bindZone(body, zkey){
-  body.addEventListener("dragover",function(ev){
+  function acceptDrag(ev){
     if(!dragId) return;
     ev.preventDefault(); ev.dataTransfer.dropEffect="move";
+    if(zkey==="done") return;                    /* 完成区按完成时间排序 */
     body.classList.add("over");
-    showDrop(body, ev.clientY, zkey);
-  });
+    showDrop(body, ev.clientY);
+  }
+  /* 让位后鼠标下方的卡片可能改变，立即接受新的落点。 */
+  body.addEventListener("dragenter",acceptDrag);
+  body.addEventListener("dragover",acceptDrag);
   body.addEventListener("dragleave",function(ev){
-    if(!body.contains(ev.relatedTarget)){ body.classList.remove("over"); clearDrop(); }
+    if(body.contains(ev.relatedTarget)) return;
+    body.classList.remove("over");
+    if(dropEl && dropEl.parentNode===body) slideThreadRows(function(){ dropEl.remove(); });
+    if(zkey==="done") setNearDone(false);
   });
   body.addEventListener("drop",function(ev){
     if(!dragId) return;
     ev.preventDefault();
-    body.classList.remove("over");
     var idx=dropIndex(body);
     var id=dragId;
-    clearDrop();
     dropHandled=true; landId=id;
     moveItem(id, zkey, idx);
   });
 }
-function showDrop(body, y, zkey){
-  if(zkey==="done"){ clearDrop(); return; }        /* 完成区按完成先后排，插哪儿都一样 */
-  var cards=Array.prototype.slice.call(body.querySelectorAll(".dragitem"));
+function showDrop(body, y){
+  var cards=body.querySelectorAll(".dragitem");
   var before=null;
+  var offsetY=y-body.getBoundingClientRect().top-body.clientTop;
   for(var i=0;i<cards.length;i++){
-    var r=cards[i].getBoundingClientRect();
-    if(y < r.top + r.height/2){ before=cards[i]; break; }
+    if(cards[i].dataset.fid===dragId) continue;
+    if(offsetY<cards[i].offsetTop+cards[i].offsetHeight/2){ before=cards[i]; break; }
   }
-  if(!dropEl) dropEl=el("div","dropline");
-  if(before) body.insertBefore(dropEl, before); else body.appendChild(dropEl);
+  if(dropEl.parentNode!==body || dropEl.nextElementSibling!==before){
+    slideThreadRows(function(){ body.insertBefore(dropEl,before); });
+  }
 }
 function dropIndex(body){
   if(!dropEl || dropEl.parentNode!==body) return -1;
   var kids=Array.prototype.filter.call(body.children, function(n){
-    return n===dropEl || n.classList.contains("dragitem");
+    return n===dropEl || (n.classList.contains("dragitem") && n.dataset.fid!==dragId);
   });
   return kids.indexOf(dropEl);
 }
 function clearDrop(){
   Array.prototype.forEach.call(document.querySelectorAll(".zonebody"), function(b){ b.classList.remove("over"); });
-  if(dropEl && dropEl.parentNode) dropEl.parentNode.removeChild(dropEl);
+  if(dropEl){ dropEl.remove(); dropEl.style.height=""; }
   nearDone=false; hideSlot();
 }
 
@@ -2875,7 +2942,10 @@ function moveItem(id, zkey, idx, fly){
     }
   }
   if(zkey==="done") justDone=it.id;
-  var apply=function(){ reorder(d.items, it, zkey, idx); saveThread(); renderToday(); };
+  var apply=function(){
+    if(dragId===id) clearDrop();
+    reorder(d.items, it, zkey, idx); saveThread(); renderToday();
+  };
   if(fly) flyTo(id, apply); else flyTo(null, apply, id);
   if(zkey==="done") setTimeout(checkAllDone, 420);
 }
